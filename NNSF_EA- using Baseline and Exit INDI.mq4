@@ -203,39 +203,39 @@ int CurrentDirection(ENUM_TIMEFRAMES _timeFrame){
 //                    2: for ICHIMOKU as the confirmation Indicator
 // ----------------------------------------------------
 bool OkToBuy(int _confIndi){
-    double _blue, _red;
+    double _main, _signal;
     if  (_confIndi == 1) {
         // _confIndi is RVI(period)
         // Check for confirmation using RVI
-        _blue = iRVI(NULL, 0, RVI_period, MODE_SIGNAL, 0);
-        _red = iRVI(NULL,0,RVI_period, MODE_MAIN,0);
-        if (_red > _blue) return true;
+        _signal = iRVI(NULL, 0, RVI_period, MODE_SIGNAL, 0);
+        _main = iRVI(NULL,0,RVI_period, MODE_MAIN,0);
+        if (_main < _signal) return true;
         } 
         else
         {
           // _confIndi is Ichimoku
           //  Check for confirmation using ICHIMOKU
-          _red =iIchimoku(NULL,0,9,26,52,MODE_TENKANSEN,0); // Tenkan Sen
-          _blue =iIchimoku(NULL,0,9,26,52,MODE_KIJUNSEN,0); // Kijun Sen
-        if (_red > _blue) return true;
+          _signal =iIchimoku(NULL,0,9,26,52,MODE_TENKANSEN,0); // Tenkan Sen
+          _main =iIchimoku(NULL,0,9,26,52,MODE_KIJUNSEN,0); // Kijun Sen
+        if (_main < _signal) return true;
         }
     return false;
   }
 bool OkToSell(int _confIndi){
-     double _blue, _red;
+     double _main, _signal;
     if  (_confIndi == 1) {
         // _confIndi is RVI(period)
-        _blue = iRVI(NULL,0,RVI_period, MODE_SIGNAL,0);
-        _red = iRVI(NULL,0,RVI_period, MODE_MAIN,0);
-         if (_red < _blue) return true;
+        _signal = iRVI(NULL,0,RVI_period, MODE_SIGNAL,0);
+        _main = iRVI(NULL,0,RVI_period, MODE_MAIN,0);
+         if (_main > _signal) return true;
         } 
         else
         {
           // _confIndi is Ichimoku
-          _red =iIchimoku(NULL,0,9,26,52,MODE_TENKANSEN,0); // Tenkan Sen
-          _blue =iIchimoku(NULL,0,9,26,52,MODE_KIJUNSEN,0); // Kijun Sen
+          _signal =iIchimoku(NULL,0,9,26,52,MODE_TENKANSEN,0); // Tenkan Sen
+          _main =iIchimoku(NULL,0,9,26,52,MODE_KIJUNSEN,0); // Kijun Sen
     
-          if (_red < _blue) return true;
+          if (_main > _signal) return true;
         }
     
         return false;
@@ -448,11 +448,11 @@ int start(){
               "Sell ENtry:" + SellSignal() +"   Buy Entry: " + BuySignal());
 
 
-    if  (OkToBuy(ConfIndi)){  
-        // BUy Only MODE
+    if (BuySignal()){
+        // Buy Signal Spotted
         //-----------------------------------------------------
-        // Check for BUY SIgnal
-        if (BuySignal()){
+        if  (OkToBuy(ConfIndi)){ 
+            // Check COnfirmation Indicators if Long is Allowed
             ticket =   OrderSend(Symbol(), 
                         OP_BUY, 
                         LotsOptimized(PercentRisk, LongSL), Ask,5, LongSL, LongTP, 
@@ -464,8 +464,8 @@ int start(){
               else
                 Print("Error Opening BUY  Order: ", GetLastError());
                 return(0);
-            } // End If BuySignal() Function Call
-      } //End If OkToBuy() Function Call
+            } //End If OkToBuy() Function Call
+      } // End If BuySignal() Function Call
  
     // Sell - Short position only
      if (OkToSell(ConfIndi)){  
