@@ -98,7 +98,7 @@ ENUM_TIMEFRAMES ChartTimeFrame(int chartTimeFrame){
 // INDICATORS
 //====================================================================================
 // Time Frame must be of type PERIOD
-//  _mode is MODE_SMA, MODE_SMA 
+//  _mode is MODE_SMA, MODE_EMA 
 double BaseLine(int _period, ENUM_TIMEFRAMES _timeFrame, ENUM_MA_METHOD _mode){
   return  iMA(NULL, _timeFrame, _period, 0, _mode, PRICE_CLOSE, 0);
   } //
@@ -185,10 +185,10 @@ double LotsOptimized(int _RiskPerTrade, int _StopLoss)  {
 //          2 : ONly Sell and candles are forming below the Baseline
 // -------------------------------------------------------
 int CurrentDirection(ENUM_TIMEFRAMES _timeFrame){
-   // Buy  - 1
+   // Long  - 1
    if (Previous_Close(_timeFrame) > BaseLine(BaseLinePeriod, ChartTimeFrame(0),0))
       return 1;
-   // Sell - 2  
+   // Short - 2  
    if (Previous_Close(_timeFrame) < BaseLine(BaseLinePeriod, ChartTimeFrame(0),0)) 
       return 2; //"Candles are formed above 200 EMA") 
   return 0;
@@ -204,6 +204,8 @@ int CurrentDirection(ENUM_TIMEFRAMES _timeFrame){
 // ----------------------------------------------------
 bool OkToBuy(int _confIndi){
     double _main, _signal;
+    if (!(CurrentDirection(PERIOD_D1)==1)) 
+        return false;
     if  (_confIndi == 1) {
         // _confIndi is RVI(period)
         // Check for confirmation using RVI
