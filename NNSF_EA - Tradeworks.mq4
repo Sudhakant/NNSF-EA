@@ -6,7 +6,8 @@
 #property copyright   "2019, PilTrader."
 #property link        "http://pinoyFxTrader.blogspot.com"
 #property description " No-NON-Sense Forex Strategy - adopted from VP's strategy of Nononsenseforex.com " 
-/*                  INDICATORS
+/*          FOR TRADEWORKS
+                    INDICATORS
                         > SMA 20 at any  timeframe"  
                         > Ichimoku - The Tenkan-sen & Kijun-sen only (1st conf indicator)
                         > RVI - (2nd conf indicator)
@@ -26,21 +27,13 @@
     ==============================================================================================================
     LOGS 
     ==============================================================================================================
-    * Workign on LotsOptimized() function
-    * Dec 2, 2019
-    * * > if UseMM == false, okay.
-    * * > if UseMM == true, Not OKAY as of Dec 3, 2019
-    *       Bug - returned value of LotsOptimized() is zero if account size < 20k.
-    *             and 1 if account = 20k
-    *           - There are 2 moving averages reflected in the chart.
-
-
+    fOR tRADeWorks - SImplified
  */
 #define MAGICNUM  20131111
 
 // Define our Parameters
 input double Lots          = 0.01;
-input bool UseMM = true;
+// input bool UseMM = true;
 input int PercentRisk = 1;
 // input int TakeProfit       = 3500; // No take Profit because this is a trend following
 input int StopLoss         = 0; // The default stop loss (0 disable)
@@ -49,10 +42,11 @@ input int TrailingStop = 0; // Trail after 1000 points distance (0 disable)
 input ENUM_MA_METHOD SMA_method = 1;   // Averaging method: 0 - SMA, 1 - EMA, 2 - SMMA, 3 - LWMA  
 input int BaseLinePeriod  = 20;  //  EMA Trend Period at D1 Chart
 input int ConfIndi = 2;  // 1 - RVI, 2 - Ichimoku   
-input int ATR_Period = 14; // ATR default period
+// input int ATR_Period = 14; // ATR default period
 input int RVI_period = 14;  // RVI period
-int Sell_counter = 0;
-int Buy_counter = 0;
+// input int TimeFrame = 5; // to be feed in ChartTimeFrame() 1=1, 2=5m 3=15, 4 = 30, 5=H1, ...
+// int Sell_counter = 0;
+// int Buy_counter = 0;
 //+------------------------------------------------------------------+
 //| expert initialization functions                                  |
 //+------------------------------------------------------------------+
@@ -87,49 +81,50 @@ int deinit()
 //     if (chartTimeFrame == 8)  // Weekly
 //     if (chartTimeFrame == 9)  // Monthly
 ENUM_TIMEFRAMES ChartTimeFrame(int chartTimeFrame){
-    if (chartTimeFrame == 1) return 1;      //1 minute      
-    if (chartTimeFrame == 2) return 5;      //5 minute
-    if (chartTimeFrame == 3) return 15;     //15 minute
-    if (chartTimeFrame == 4) return 30;     //30 minute
-    if (chartTimeFrame == 5) return 60;     // 1 hour
-    if (chartTimeFrame == 6) return 240;    // 4 hour
-    if (chartTimeFrame == 7) return 1440;   // Daily
-    if (chartTimeFrame == 8) return 10080;  // Weekly
-    if (chartTimeFrame == 9) return 43200;  // Monthly
-    return 0 ;
+    if (chartTimeFrame == 1)
+      return PERIOD_M1;                     //1 minute
+    if (chartTimeFrame == 2)
+      return PERIOD_M5;                     //5 minute
+    if (chartTimeFrame == 3)
+      return PERIOD_M15;                     //15 minute
+    if (chartTimeFrame == 4)
+      return PERIOD_M30;                     //30 minute
+    if (chartTimeFrame == 5)
+      return PERIOD_H1;                     // 1 hour
+    if (chartTimeFrame == 6)
+      return PERIOD_H4;                     // 4 hour
+    if (chartTimeFrame == 7)
+      return PERIOD_D1;                     // Daily
+    if (chartTimeFrame == 8)
+      return PERIOD_W1;                     // Weekly
+    if (chartTimeFrame == 9)
+      return PERIOD_MN1;                    // Monthly
+    return PERIOD_CURRENT;
 }
 //====================================================================================
 // INDICATORS
 //====================================================================================
 // Time Frame must be of type PERIOD
 //  _mode is MODE_SMA, MODE_EMA 
-double BaseLine(int _period, ENUM_TIMEFRAMES _timeFrame, ENUM_MA_METHOD _mode){
-  return  iMA(NULL, _timeFrame, _period, 0, _mode, PRICE_CLOSE, 0);
+double BaseLine(int _shiftPeriod){
+  return  iMA(NULL, ChartTimeFrame(0), BaseLinePeriod, 0, SMA_method, PRICE_CLOSE, _shiftPeriod);
   } //
 
- // Check the ATR for TP and SL USE
- //  Use 1.5  of ATR for SL and 2.5ATR for TP
- //  _timeFrame must be D1
-double ATR(ENUM_TIMEFRAMES _timeFrame){
-      return iATR(NULL,0,ATR_Period,0);
-} // End ATR()
-
-
 // =====================================================================================
-double Previous_High(int _timeFrame){
-   return iHigh(NULL, _timeFrame, 1);
+double Previous_High(int _timeFrame, int _shfitPeriod){
+   return iHigh(NULL, _timeFrame, _shfitPeriod);
 }
 
-double Previous_Low(int _timeFrame) {
-    return iLow(NULL, _timeFrame, 1);
+double Previous_Low(int _timeFrame, int _shfitPeriod) {
+    return iLow(NULL, _timeFrame, _shfitPeriod);
 }
 
-double Previous_Close(int _timeFrame) {
-      return iClose(NULL, _timeFrame, 1);                 
+double Previous_Close(int _timeFrame, int _shfitPeriod) {
+      return iClose(NULL, _timeFrame, _shfitPeriod);                 
 } 
 
-double Previous_Open (int _timeFrame) {
- return iOpen( NULL, _timeFrame, 1);              
+double Previous_Open (int _timeFrame, int _shfitPeriod) {
+ return iOpen( NULL, _timeFrame, _shfitPeriod);              
 }
 
 double Current_Low(int _timeFrame){
@@ -148,51 +143,6 @@ double Current_Open (int _timeFrame){
   return iOpen( NULL, _timeFrame, 0);           
 }
 
-// Optimized Lot size based on the RIsk Factor decided by the trader by passing it in the 
-// Function thru _RiskPerTrade
-double LotsOptimized(int _RiskPerTrade, int _StopLoss)  {
-  int lots;
-  if (UseMM == false){
-    //  Get the market information of the Instrument
-    lots = MarketInfo(Symbol(), MODE_MINLOT);
-    if (Lots < lots)  return lots;
-    else return Lots;   
-    } //end if(UseMM == false)
-   
-   //If Money Management is set to TRUE
-  if (UseMM == true){
-    double tickvalue = (MarketInfo(Symbol(),MODE_TICKVALUE));
-    double riskcapital = AccountBalance()*_RiskPerTrade/100;
-    lots=(riskcapital/_StopLoss)/tickvalue;
-    if(Digits == 5 || Digits == 3){
-        tickvalue = tickvalue*10;
-      }
-    if( checkFund() == false )          // is money enough for opening 0.01 lot?
-        // if( ( AccountFreeMarginCheck( Symbol(), OP_BUY,  0.01 ) > AccountStopoutLevel())  || 
-        //     ( AccountFreeMarginCheck( Symbol(), OP_SELL, 0.01 ) > AccountStopoutLevel())  || 
-        //     ( GetLastError() == 134 ) )
-        lots = 0.00; // not enough
-    else        
-          lots = 0.01; // enough; open 0.01           
-    lots = NormalizeDouble(lots, 2 ); 
-    return(lots);
-    } //End if (UseMM == true)
-    Print("Debug out: lot value", lots); 
-   return 0;
-  } //End LotsOptimized
-
-bool checkFund(){
-  if  (((AccountStopoutMode() == 1) && (AccountFreeMarginCheck(Symbol(), OP_SELL, 0.01) > AccountStopoutLevel())||
-       AccountFreeMarginCheck(Symbol(), OP_BUY, 0.01) > AccountStopoutLevel()) || 
-      ((AccountStopoutMode() == 0) && 
-      ((AccountEquity() / (AccountEquity() - AccountFreeMarginCheck(Symbol(), OP_SELL, 0.01))
-          * 100) > AccountStopoutLevel())||
-        (AccountEquity() / (AccountEquity() - AccountFreeMarginCheck(Symbol(), OP_BUY, 0.01)) 
-          * 100) > AccountStopoutLevel()))   
-    return true;
-  return false;
-}
-
 //  Using the information of the 20 EMA
 //  Returns :
 //          1 : Only Buy and candles are forming above the Baseline
@@ -200,10 +150,10 @@ bool checkFund(){
 // -------------------------------------------------------
 int CurrentDirection(ENUM_TIMEFRAMES _timeFrame){
    // Long  - 1
-   if (Previous_Close(_timeFrame) > BaseLine(BaseLinePeriod, ChartTimeFrame(0),0))
+   if (Previous_Close(_timeFrame, 1) > BaseLine(0))
       return 1;
    // Short - 2  
-   if (Previous_Close(_timeFrame) < BaseLine(BaseLinePeriod, ChartTimeFrame(0),0)) 
+   if (Previous_Close(_timeFrame, 1)< BaseLine(0)) 
       return 2; //"Candles are formed above 200 EMA") 
   return 0;
 } // End CurrentDirection() Function
@@ -217,63 +167,65 @@ int CurrentDirection(ENUM_TIMEFRAMES _timeFrame){
 //                    2: for ICHIMOKU as the confirmation Indicator
 // ----------------------------------------------------
 bool OkToBuy(int _confIndi){
-    double _main, _signal;
-    if (!(CurrentDirection(PERIOD_D1)==1)) 
+    double _main, _signal, _conf2_main, _conf2_signal;
+    if (!(CurrentDirection(ChartTimeFrame(0))==1)) 
         return false;
     if  (_confIndi == 1) {
         // _confIndi is RVI(period)
         // Check for confirmation using RVI
         _signal = iRVI(NULL, 0, RVI_period, MODE_SIGNAL, 0);
         _main = iRVI(NULL,0,RVI_period, MODE_MAIN,0);
-        if (_main < _signal) return true;
+        _conf2_signal =iIchimoku(NULL,0,9,26,52,MODE_TENKANSEN,0); // Tenkan Sen
+        _conf2_main =iIchimoku(NULL,0,9,26,52,MODE_KIJUNSEN,0); // Kijun Sen
+        if ((_signal < _main) && (_conf2_signal > _conf2_main))
+          return true;
         } 
-        else
-        {
+    if (_confIndi == 2){
           // _confIndi is Ichimoku
           //  Check for confirmation using ICHIMOKU
           _signal =iIchimoku(NULL,0,9,26,52,MODE_TENKANSEN,0); // Tenkan Sen
           _main =iIchimoku(NULL,0,9,26,52,MODE_KIJUNSEN,0); // Kijun Sen
-        if (_main < _signal) return true;
+          _conf2_signal = iRVI(NULL, 0, RVI_period, MODE_SIGNAL, 0);
+          _conf2_main = iRVI(NULL,0,RVI_period, MODE_MAIN,0);
+        if ((_signal > _main) && (_conf2_signal < _conf2_main))
+          return true;
         }
     return false;
+
   }
+
+
 bool OkToSell(int _confIndi){
-     double _main, _signal;
-    if  (_confIndi == 1) {
+    double _main, _signal, _conf2_main, _conf2_signal;
+    if (!(CurrentDirection(ChartTimeFrame(0))==2)) 
+    if  (_confIndi == 1) 
+        {
         // _confIndi is RVI(period)
-        _signal = iRVI(NULL,0,RVI_period, MODE_SIGNAL,0);
+        _signal = iRVI(NULL, 0, RVI_period, MODE_SIGNAL, 0);
         _main = iRVI(NULL,0,RVI_period, MODE_MAIN,0);
-         if (_main > _signal) return true;
+        _conf2_signal =iIchimoku(NULL,0,9,26,52,MODE_TENKANSEN,0); // Tenkan Sen
+        _conf2_main =iIchimoku(NULL,0,9,26,52,MODE_KIJUNSEN,0); // Kijun Sen
+         if ((_signal > _main ) && (_conf2_signal < _conf2_main))
+           return true;
         } 
         else
-        {
+          return false;
+    if  (_confIndi == 1) {
           // _confIndi is Ichimoku
-          _signal =iIchimoku(NULL,0,9,26,52,MODE_TENKANSEN,0); // Tenkan Sen
+           _signal =iIchimoku(NULL,0,9,26,52,MODE_TENKANSEN,0); // Tenkan Sen
           _main =iIchimoku(NULL,0,9,26,52,MODE_KIJUNSEN,0); // Kijun Sen
-    
-          if (_main > _signal) return true;
+          _conf2_signal = iRVI(NULL, 0, RVI_period, MODE_SIGNAL, 0);
+          _conf2_main = iRVI(NULL,0,RVI_period, MODE_MAIN,0);
+          if ((_signal < _main ) && (_conf2_signal > _conf2_main))
+           return true;
         }
+        else
+          return false;
+        
+     return false;
     
-        return false;
 } // End of OkToSell - this is one of the two(2) functions that validates/confirm the signal
 
-// Draw line on the price level
-//  Accepts parameter _priceLevel - price level where the arrow is drawn
-bool DrawArrowUp(double _priceLevel){
-    string name = "Buy";
-    if (ObjectFind(0,"pricelevel") < 0){
-        if (!ObjectCreate(
-          name,
-          OBJ_HLINE, 0, 0,
-          _priceLevel, 0, 0, 0, 0)) 
-          {
-            Print("Error: can't create line! code #",GetLastError());
-            return false;
-          }
-      }
-      return false;
-
-} // End DrawArrowUp() Function
 
 // ----------------------------------------------------------------------------------
 // This is to check for a sell signal - 
@@ -282,28 +234,25 @@ bool DrawArrowUp(double _priceLevel){
 //          Current Open is now BELOW the Baseline
 // The Confirmation Indicator shall validate if Okay to sell
 bool SellSignal(){
-  double _baseline = BaseLine(BaseLinePeriod, PERIOD_D1, MODE_SMA);
- if ((Previous_Open(PERIOD_D1) >= _baseline) &&
-      (Current_Open(PERIOD_D1) < _baseline)) {
-      Print ("SELL Signal Spotted: Price crosses the baseline and open Below of the  Baseline. ");
-      Sell_counter = Sell_counter + 1;
+ if ((Previous_Open(ChartTimeFrame(0), 1) > BaseLine(0)) &&
+      (Current_Open(ChartTimeFrame(0)) < BaseLine(0))) {
+      // Print ("SELL Signal Spotted: Price crosses the baseline and open Below of the  Baseline. ");
       return true; // Sell Signal Spotted!!!
     }
 
-  //  Price Pulbacks / Retraces from the Baseline
-   if ((Previous_High(PERIOD_D1) < _baseline) &&
-      (Current_High(PERIOD_D1) > _baseline && Current_Close(PERIOD_D1) < _baseline )) {
-      Print("SELL Signal Spotted: Price retraces in the  Baseline Resistance. ");
-      Sell_counter = Sell_counter + 1;
-      return true; // Sell Signal Spotted!!!
-    }     
+  // //  Price Pulbacks / Retraces from the Baseline
+  //  if ((Previous_High(ChartTimeFrame(TimeFrame), 1) < BaseLine(0)) &&
+  //     (Current_High(ChartTimeFrame(TimeFrame)) > BaseLine(0) && Current_Close(ChartTimeFrame(TimeFrame)) < BaseLine(0) )) {
+  //     Print("SELL Signal Spotted: Price retraces in the  Baseline Resistance. ");
+  //     return true; // Sell Signal Spotted!!!
+  //   }     
 
-  // Price Gaps crossing over the baseline
-    if ((Previous_Low(PERIOD_D1) > _baseline) &&
-        (Current_Open(PERIOD_D1) < _baseline)){
-      Print("SELL Signal Spotted: Price GAPS from above Baseline to below Baseline. ");
-      return true;
-    }
+  // // Price Gaps crossing over the baseline
+  //   if ((Previous_Low(ChartTimeFrame(TimeFrame), 1) > BaseLine(0)) &&
+  //       (Current_Open(ChartTimeFrame(TimeFrame)) < BaseLine(0))){
+  //     Print("SELL Signal Spotted: Price GAPS from above Baseline to below Baseline. ");
+  //     return true;
+  //   }
   return false;
 
 } // End SellSignal() Function
@@ -316,25 +265,24 @@ bool SellSignal(){
 //          Current Open is now BELOW the Baseline
 // The Confirmation Indicator shall validate if Okay to BUY
 bool BuySignal(){
-  double _baseline = BaseLine(BaseLinePeriod, PERIOD_D1, MODE_SMA);
   // Price Cross over
-  if ((Previous_Open(PERIOD_D1) <= _baseline) &&
-      (Current_Open(PERIOD_D1) > _baseline)) {
-      Print("Buy Signal Spotted: Price crosses the baseline and open above the  Baseline. ");
+  if ((Previous_Open(ChartTimeFrame(0), 1) < BaseLine(0)) &&
+      (Current_Open(ChartTimeFrame(0)) > BaseLine(0))) {
+      // Print("Buy Signal Spotted: Price crosses the baseline and open above the  Baseline. ");
       return true; // Buy Signal Spotted!!!
     }
   //  Price Pulbacks / Retraces from the Baseline
-  if ((Previous_Low(PERIOD_D1) > _baseline) &&
-      (Current_Low(PERIOD_D1) < _baseline && Current_Close(PERIOD_D1) > _baseline )) {
-      Print("Buy Signal Spotted: Price retraces in the  Baseline Support. ");
-      return true; // Buy Signal Spotted!!!
-    }     
-     // Price Gaps crossing over the baseline
-  if ((Previous_High(PERIOD_D1) < _baseline) &&
-        (Current_Open(PERIOD_D1) > _baseline)){
-      Print("SELL Signal Spotted: Price GAPS from below the  Baseline to the above of the Baseline. ");
-      return true;
-    }
+  // if ((Previous_Low(ChartTimeFrame(TimeFrame)) > BaseLine()) &&
+  //     (Current_Low(ChartTimeFrame(TimeFrame)) < BaseLine() && Current_Close(ChartTimeFrame(TimeFrame)) > BaseLine() )) {
+  //     Print("Buy Signal Spotted: Price retraces in the  Baseline Support. ");
+  //     return true; // Buy Signal Spotted!!!
+  //   }     
+  //    // Price Gaps crossing over the baseline
+  // if ((Previous_High(ChartTimeFrame(TimeFrame)) < BaseLine()) &&
+  //       (Current_Open(ChartTimeFrame(TimeFrame)) > BaseLine())){
+  //     Print("SELL Signal Spotted: Price GAPS from below the  Baseline to the above of the Baseline. ");
+  //     return true;
+  //   }
   return false;
 } //End of BuySignal() Function
 
@@ -410,7 +358,7 @@ void TrailStopSell(int _trailingStop){
 //+------------------------------------------------------------------+
 int start(){ 
   int ticket, total;
-  double ShortSL, ShortTP, LongSL, LongTP,  curr_ATR;
+  double ShortSL, ShortTP, LongSL, LongTP;
   
   // Get the current total orders
   total = OrdersTotal();
@@ -422,20 +370,7 @@ int start(){
   
   // Only open one trade at a time..
   if(total < 1){
-    // Compute for the SL and TP based on the ATR
-    // if StopLoss is set to AUTO (1.5 ATR)
-    // if TP is set to AUTO (3.0 ATR)
-    curr_ATR = ATR(PERIOD_D1);
-    if (StopLoss < 1){
-        LongSL = Ask-(curr_ATR*1.5);
-        ShortSL = Bid+(curr_ATR*1.5);
-        }
-    if (TakeProfit < 1 ){
-        LongTP = Ask+(curr_ATR*3.0);
-        ShortTP = Bid-(curr_ATR*3.0);
-        }
-  
-    // Calculate Stop Loss  and Take profit levels based on Pre Defined SL & TP Levels
+     // Calculate Stop Loss  and Take profit levels based on Pre Defined SL & TP Levels
     if(StopLoss > 0){
       LongSL =  Ask-(StopLoss*Point);
       ShortSL = Bid+(StopLoss*Point);
@@ -448,31 +383,26 @@ int start(){
     Comment("Current SPREAD in points : " + MarketInfo(NULL, MODE_SPREAD) + "\n"+
               "Spread in Pips: " + (MarketInfo(NULL, MODE_SPREAD) * Point) +  "POINT : " + Point + "  DIGITS: " + Digits() + "\n" +
               "Tick Value: " + MarketInfo(Symbol(),MODE_TICKVALUE) +"\n"+"\n"+
-              "Trade Direction (1) UP (2) DOWN : " + CurrentDirection(PERIOD_D1) + "\n" +
-              "Optimized Lot SIze: " + LotsOptimized(PercentRisk, LongSL) + " PercentRisk:", PercentRisk, "  LongStopLoss: ", LongSL, "  ShortStopLoss: ", ShortSL + "\n"+
-              "MA 20 Value : " + BaseLine(BaseLinePeriod, PERIOD_D1, 1) + "   ATR LEVEL: " + ATR(PERIOD_D1) + "\n" +
-              "Previous_Open :" + Previous_Open(ChartTimeFrame(PERIOD_D1)) + "\n" +
-              "Previous_Close  :" + Previous_Close(ChartTimeFrame(PERIOD_D1)) + "\n" +
-              "Current Open :" + Current_Open(ChartTimeFrame(PERIOD_D1)) + "\n" +
-              "Current Close  :" + Current_Close(ChartTimeFrame(PERIOD_D1)) + "\n" +
-              "Checking for SELL Entry: " + SellSignal() + "  Sell signals: " + Sell_counter + "\n"+
-              "Checking for BUY Entry: " + BuySignal() + "   Buy Signals: " + Buy_counter + "\n" +
-              "Using Ichimoku - Okay to Buy Now? : " + OkToBuy(ConfIndi) + "\n" +
-              "Using Ichimoku - Okay to Sell Now? : " + OkToSell(ConfIndi) + "\n" +
+              "Trade Direction (1) UP (2) DOWN : " + CurrentDirection(ChartTimeFrame(0)) + "\n" +
+              " PercentRisk:", PercentRisk, "  LongStopLoss: ", LongSL, "  ShortStopLoss: ", ShortSL + "\n"+
+              "MA 20 Value (current/ [5 periods ago]): " + BaseLine(0) +  "/" + BaseLine(5) +"\n" +
+              "Checking for SELL Entry: " + SellSignal() +  "\n"+
+              "Checking for BUY Entry: " + BuySignal() +   "\n" +
+              "Using Ichimoku - Okay to Buy Now? : " + OkToBuy(2) + "\n" +
               "Using RVI - Okay to Buy Now? : " + OkToBuy(1) + "\n" +
+              "Using Ichimoku - Okay to Sell Now? : " + OkToSell(2) + "\n" +
               "Using RVI - Okay to Sell Now? : " + OkToSell(1)+ "\n" +
               "Sell ENtry:" + SellSignal() +"   Buy Entry: " + BuySignal());
 
-
-    if (BuySignal()){
+    if (BuySignal()== true){
         // Buy Signal Spotted
         //-----------------------------------------------------
         if  (OkToBuy(ConfIndi)){ 
-            // Check COnfirmation Indicators if Long is Allowed
-            ticket =   OrderSend(Symbol(), 
-                        OP_BUY, 
-                        LotsOptimized(PercentRisk, LongSL), Ask,5, LongSL, LongTP, 
-                        "NNSF - BUY",MAGICNUM,0,Blue);
+           
+           ticket =  OrderSend(Symbol(),
+                      OP_BUY, 
+                      Lots, Ask,5, LongSL, LongTP, 
+                      "NNSF - BUY",MAGICNUM,0,Blue);
             if(ticket > 0){
               if(OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
                 Print("BUY Order Opened: ", OrderOpenPrice(), " SL:", LongSL, " TP: ", LongTP);
@@ -481,17 +411,17 @@ int start(){
                 Print("Error Opening BUY  Order: ", GetLastError());
                 return(0);
             } //End If OkToBuy() Function Call
-      } // End If BuySignal() Function Call
+    } // End If BuySignal() Function Call
  
+    // SHORT ONLY MODE
+    // ---------------------------------------
+    // Check for Sell Signal
     // Sell - Short position only
-     if (OkToSell(ConfIndi)){  
-        // SHORT ONLY MODE
-        // ---------------------------------------
-        // Check for Sell Signal
-        if (SellSignal()){
-            ticket =  OrderSend(Symbol(), 
+    if (SellSignal() == true){
+      if (OkToSell(ConfIndi)){  
+          ticket =  OrderSend(Symbol(), 
                   OP_SELL, 
-                  LotsOptimized(PercentRisk, ShortSL), Bid,5, ShortSL, ShortTP, 
+                  Lots, Bid,5, ShortSL, ShortTP, 
                   "NNSF - SELL",MAGICNUM,0,Red);
             if(ticket > 0){
               if(OrderSelect(ticket, SELECT_BY_TICKET, MODE_TRADES))
